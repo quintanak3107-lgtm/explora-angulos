@@ -1,0 +1,216 @@
+const STORAGE_KEY='angleStarsV8';
+const AWARDED_KEY='angleAwardedV8';
+let stars=Number(localStorage.getItem(STORAGE_KEY)||0);
+let awarded=JSON.parse(localStorage.getItem(AWARDED_KEY)||'[]');
+const MAX_STARS=37;
+const star=document.getElementById('stars');
+function upd(){star.textContent=stars;localStorage.setItem(STORAGE_KEY,String(stars));}
+function award(activity){
+  if(awarded.includes(activity)) return false;
+  awarded.push(activity);
+  localStorage.setItem(AWARDED_KEY,JSON.stringify(awarded));
+  if(stars<MAX_STARS){stars++;upd();}
+  return true;
+}
+upd();
+const routeOrder=['inicio','nodo2','nodo3','nodo4','nodo5','nodo6','nodo7','nodo8'];
+const routeNames={inicio:'Inicio',nodo2:'¿Qué es un ángulo?',nodo3:'Tipos',nodo4:'Medición',nodo5:'Vida cotidiana',nodo6:'Figuras',nodo7:'Relaciones',nodo8:'Reto final'};
+function showNode(id){document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));const target=document.getElementById(id);if(!target)return;target.classList.add('active');scrollTo({top:0,behavior:'smooth'});}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-node]');if(b)showNode(b.dataset.node)});
+document.addEventListener('click',e=>{const b=e.target.closest('.example-open');if(b){e.preventDefault();openExample(b.dataset.example)}});
+
+function normalize(s){return String(s||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
+function feedbackSuccess(el,msg,activity){const got=activity?award(activity):false;el.textContent='🎉 '+msg+(activity?(got?' +1 estrella':' Esta actividad ya tenía su estrella.'):'');el.className='feedback game-success';return got;}
+function feedbackRetry(el,msg){el.textContent='💡 '+msg;el.className='feedback game-error';}
+
+// Actividades de respuesta libre: la corrección aparece solo después de comprobar.
+document.querySelectorAll('.input-quiz').forEach(box=>{
+  const input=box.querySelector('.answer-input'), btn=box.querySelector('.check-input'), feed=box.querySelector('.feedback');
+  if(!input||!btn||!feed)return;
+  const activity=box.dataset.activity;
+  const expected=box.dataset.answer||'';
+  function check(){
+    const value=input.value;
+    if(!value.trim()){feed.textContent='✏️ Escribí una respuesta antes de comprobar.';feed.className='feedback game-error';return;}
+    let ok;
+    if(input.type==='number') ok=Number(value)===Number(expected);
+    else ok=normalize(value)==='vertice' || normalize(value)==='vértice';
+    if(ok){input.disabled=true;btn.disabled=true;
+      let msg='¡Correcto!';
+      if(box.dataset.activity==='n4-calculo') msg='¡Correcto! 45° + 45° = 90°.';
+      feedbackSuccess(feed,msg,activity);
+    } else {
+      feedbackRetry(feed,input.type==='number'?'Todavía no. Revisá el cálculo y probá nuevamente.':'Casi. El punto donde se unen los lados se llama vértice.');
+    }
+  }
+  btn.addEventListener('click',check);
+  input.addEventListener('keydown',e=>{if(e.key==='Enter')check()});
+});
+
+// Mini-juegos directos: una sola recompensa por actividad.
+document.querySelectorAll('.quiz').forEach(q=>{
+  const activity=q.dataset.activity||('quiz-'+q.closest('.screen')?.id);
+  q.querySelectorAll('.opts button').forEach(b=>b.addEventListener('click',()=>{
+    const f=q.querySelector('.feedback');
+    if(normalize(b.textContent)===normalize(q.dataset.answer)){
+      q.querySelectorAll('.opts button').forEach(x=>x.disabled=true);
+      feedbackSuccess(f,'¡Correcto!',activity);
+    }else feedbackRetry(f,'Todavía no. Volvé a comparar y probá otra opción.');
+  }));
+});
+
+const qs=[
+ ['Un ángulo mide 38°. ¿Cuánto le falta para llegar a 90°?',['42°','52°','62°','128°'],'52°','calc-1'],
+ ['Un triángulo tiene ángulos de 70° y 45°. ¿Cuánto mide el tercero?',['55°','65°','75°','85°'],'65°','tri-1'],
+ ['Un ángulo de 135° es...',['agudo','recto','obtuso','llano'],'obtuso','type-1'],
+ ['Una vuelta completa mide...',['90°','180°','270°','360°'],'360°','turn-1'],
+ ['Si un ángulo mide 25°, ¿cuánto mide su complementario?',['55°','65°','75°','155°'],'65°','comp-1'],
+ ['Si un ángulo mide 120°, ¿cuánto mide su suplementario?',['50°','60°','70°','80°'],'60°','supp-1'],
+ ['Para medir con precisión la amplitud de un ángulo usamos...',['regla','transportador','compás','escuadra'],'transportador','tool-1'],
+ ['Dos rectas se cruzan. Si uno de los ángulos mide 72°, su opuesto por el vértice mide...',['18°','72°','108°','288°'],'72°','vert-1']
+];
+let i=0,score=0;
+const q=document.getElementById('question'),opts=document.getElementById('gameopts'),feed=document.getElementById('gfeed'),next=document.getElementById('next'),bar=document.getElementById('bar'),qn=document.getElementById('qnum'),gs=document.getElementById('gscore'),res=document.getElementById('result'),again=document.getElementById('again');
+function load(){const x=qs[i];qn.textContent=i+1;q.textContent=x[0];opts.innerHTML='';feed.textContent='';feed.className='feedback';next.classList.add('hidden');res.textContent='';bar.style.width=(i/8*100)+'%';x[1].forEach(o=>{const b=document.createElement('button');b.textContent=o;b.onclick=()=>{opts.querySelectorAll('button').forEach(z=>z.disabled=true);const ok=normalize(o)===normalize(x[2]);if(ok){score++;feedbackSuccess(feed,'¡Correcto!','n8-'+x[3]);gs.textContent=score;}else feedbackRetry(feed,'La respuesta correcta es '+x[2]+'.');next.classList.remove('hidden')};opts.appendChild(b)});}
+next.onclick=()=>{i++;if(i<8)load();else{q.textContent='🏆 ¡Reto terminado!';opts.innerHTML='';feed.textContent='';bar.style.width='100%';res.innerHTML='Obtuviste <b>'+score+' de 8</b> respuestas correctas en este intento.<br><span class="small-note">Las estrellas solo se entregan una vez por desafío.</span>';next.classList.add('hidden');again.classList.remove('hidden')}};
+again.onclick=()=>{i=0;score=0;gs.textContent=0;again.classList.add('hidden');load()};
+load();
+
+// El mini-juego de la explicación del cuadrilátero también tiene recompensa única.
+document.querySelectorAll('.mini-game').forEach((game,index)=>{
+  game.querySelectorAll('.angle-choice button').forEach(btn=>btn.addEventListener('click',()=>{
+    const feedback=game.querySelector('.feedback');
+    if(btn.dataset.correct==='yes'){game.querySelectorAll('.angle-choice button').forEach(b=>b.disabled=true);feedbackSuccess(feedback,'¡Correcto!','mini-'+index);}
+    else feedbackRetry(feedback,'Todavía no. Volvé a comparar las medidas y probá nuevamente.');
+  }));
+});
+
+const exampleData={
+ 'vertice':{title:'Encontrá el vértice',text:'El vértice es el punto donde se unen los dos lados. Mirá el dibujo y elegí el punto donde se encuentran.',formula:'Vértice = punto donde se unen los dos lados',visual:'angle-points',game:'point'},
+ 'lados':{title:'Encontrá los lados',text:'Un ángulo tiene dos lados: son las dos semirrectas que parten del vértice. Mirá el dibujo y contalos.',formula:'2 lados + 1 vértice = ángulo',visual:'two-rays',game:'count'},
+ 'llano-linea':{title:'Adiviná el ángulo de la línea',text:'Cuando los dos lados quedan enfrentados sobre una misma línea, forman un ángulo llano.',formula:'180°',visual:'straight',game:'angle180'},
+ 'llano-camino':{title:'¿Qué ángulo forman las dos direcciones?',text:'Imaginá que estás en un camino y mirás hacia adelante. Si te das vuelta y mirás exactamente hacia atrás, las dos direcciones están separadas por...',formula:'180°',visual:'road',game:'angle180'},
+ 'llano-transportador':{title:'Leé la base del transportador',text:'Si la base está alineada hacia la derecha, empezá a leer desde 0° a la derecha. La escala aumenta hacia la izquierda hasta 180°.',formula:'0° a la derecha → 180° a la izquierda',visual:'protractor',game:'angle180'},
+ 'medicion-reloj':{title:'Adiviná el ángulo del reloj',text:'Observá las agujas. A las 3:00, una apunta al 12 y otra al 3. ¿Qué ángulo forman?',formula:'3:00 → 90°',visual:'clock3',game:'angle90'},
+ 'medicion-puerta':{title:'¿Cuánto se abrió la puerta?',text:'La puerta se abre desde una posición cerrada. Mové el control y observá cómo cambia el ángulo.',formula:'La apertura se mide en grados',visual:'door',game:'door'},
+ 'vida-reloj':{title:'Detective del reloj',text:'Observá una hora al azar y decidí si el ángulo de las agujas es menor, igual o mayor que 90°. La medida exacta aparece después de responder.',formula:'',visual:'clock3',game:'clock'},
+ 'vida-tijeras':{title:'¿Qué pasa con las tijeras?',text:'Cuanto más abrimos las hojas, mayor es el ángulo. Elegí la situación que representa el ángulo más grande.',formula:'Más apertura = mayor ángulo',visual:'scissors',game:'scissors'},
+ 'vida-arquitectura':{title:'Detective de la arquitectura',text:'Buscá cuál de estos elementos tiene una esquina que representa un ángulo recto.',formula:'90°',visual:'architecture',game:'architecture'},
+ 'vida-deportes':{title:'La dirección del pase',text:'Un jugador cambia de dirección. Observá el giro y escribí cuántos grados mide el ángulo.',formula:'Un cuarto de vuelta = 90°',visual:'sport',game:'angle90'},
+ 'figura-triangulo':{title:'Completá el triángulo',text:'Dos ángulos miden 60° y 70°. ¿Cuánto debe medir el tercero para llegar a 180°?',formula:'60° + 70° + 50° = 180°',visual:'triangle',game:'triangle'},
+ 'figura-cuadrilatero':{title:'Construí los 360°',text:'Una diagonal divide un cuadrilátero en dos triángulos. Si cada uno suma 180°, ¿cuánto suman juntos?',formula:'180° + 180° = 360°',visual:'quadrilateral',game:'angle360'},
+ 'rel-complementarios':{title:'Completá el ángulo recto',text:'Un ángulo mide 35°. ¿Cuánto falta para llegar a 90°?',formula:'35° + 55° = 90°',visual:'complementary',game:'complement'},
+ 'rel-suplementarios':{title:'Completá el ángulo llano',text:'Un ángulo mide 110°. ¿Cuánto falta para llegar a 180°?',formula:'110° + 70° = 180°',visual:'supplementary',game:'supplement'},
+ 'rel-adyacentes':{title:'¿Son adyacentes?',text:'Los ángulos adyacentes comparten vértice y un lado. Elegí la figura que muestra esa relación.',formula:'Comparten vértice y un lado',visual:'adjacent',game:'adjacent'},
+ 'rel-opuestos':{title:'Descubrí los opuestos',text:'Cuando dos rectas se cruzan, los ángulos enfrentados tienen la misma medida. Elegí el par correcto.',formula:'Ángulos opuestos = misma medida',visual:'vertical',game:'opposite'}
+};
+
+
+
+function svgVisual(type){
+ const common=`viewBox="0 0 520 210" role="img"`;
+ const svgs={
+  'angle-points':`<svg ${common}><line x1="120" y1="165" x2="410" y2="165" class="svg-ray"/><line x1="120" y1="165" x2="290" y2="50" class="svg-ray"/><circle cx="120" cy="165" r="12" fill="#e86c6c"/><circle cx="290" cy="50" r="9" fill="#5b8def"/><circle cx="410" cy="165" r="9" fill="#62bd7a"/><text x="120" y="198" class="visual-label" text-anchor="middle">rojo</text><text x="290" y="30" class="visual-label" text-anchor="middle">azul</text><text x="410" y="198" class="visual-label" text-anchor="middle">verde</text></svg>`,
+  'two-rays':`<svg ${common}><line x1="125" y1="165" x2="410" y2="165" class="svg-ray"/><line x1="125" y1="165" x2="300" y2="55" class="svg-ray"/><circle cx="125" cy="165" r="9" class="svg-point"/><text x="285" y="190" class="visual-label" text-anchor="middle">lado</text><text x="315" y="70" class="visual-label" text-anchor="middle">lado</text></svg>`,
+  'straight':`<svg ${common}><line x1="70" y1="125" x2="450" y2="125" class="svg-line"/><circle cx="260" cy="125" r="9" class="svg-point"/><path d="M175 125 Q260 38 345 125" class="svg-arc"/><text x="260" y="48" class="visual-label" text-anchor="middle">180°</text><text x="58" y="155" class="visual-label" text-anchor="middle">←</text><text x="462" y="155" class="visual-label" text-anchor="middle">→</text></svg>`,
+  'road':`<svg ${common}><path d="M45 130 L475 130" class="svg-road"/><path d="M90 130 L140 130 M185 130 L235 130 M280 130 L330 130 M375 130 L425 130" class="svg-roadmark"/><circle cx="260" cy="130" r="10" class="svg-point"/><path d="M175 130 Q260 43 345 130" class="svg-arc"/><text x="260" y="55" class="visual-label">180°</text></svg>`,
+  'protractor':`<svg ${common}><path d="M90 165 A170 170 0 0 1 430 165" fill="#eaf2ff" stroke="#7fa7ef" stroke-width="6"/><line x1="90" y1="165" x2="430" y2="165" class="svg-line"/><text x="430" y="190" class="visual-label">0°</text><text x="387" y="116" class="visual-label">45°</text><text x="260" y="35" class="visual-label">90°</text><text x="133" y="116" class="visual-label">135°</text><text x="90" y="190" class="visual-label">180°</text><line x1="260" y1="165" x2="355" y2="75" class="svg-accent"/><text x="352" y="64" class="visual-label">?</text></svg>`,
+  'clock3':`<svg ${common}><circle cx="260" cy="105" r="72" class="svg-clock"/><text x="252" y="52" class="visual-label">12</text><text x="335" y="112" class="visual-label">3</text><line x1="260" y1="105" x2="260" y2="60" class="svg-hand"/><line x1="260" y1="105" x2="307" y2="105" class="svg-hand2"/><circle cx="260" cy="105" r="8" class="svg-point"/></svg>`,
+  'door':`<svg ${common}><line x1="110" y1="155" x2="430" y2="155" class="svg-line"/><rect x="102" y="55" width="16" height="100" rx="5" fill="#4267a8"/><g id="doorSketch" transform="rotate(55 110 155)"><rect x="105" y="55" width="10" height="100" rx="5" class="svg-door"/></g><circle cx="110" cy="155" r="9" class="svg-point"/><path id="doorArc" d="M110 125 A30 30 0 0 1 138 145" class="svg-arc"/><text id="doorAngleLabel" x="145" y="112" class="visual-label">?</text></svg>`,
+  'scissors':`<svg ${common}><g transform="translate(0 0)"><circle cx="85" cy="128" r="8" class="svg-point"/><line x1="85" y1="128" x2="150" y2="105" class="svg-accent"/><line x1="85" y1="128" x2="150" y2="151" class="svg-ray"/><text x="118" y="184" class="visual-label" text-anchor="middle">Casi cerradas</text></g><g transform="translate(175 0)"><circle cx="85" cy="128" r="8" class="svg-point"/><line x1="85" y1="128" x2="150" y2="72" class="svg-accent"/><line x1="85" y1="128" x2="150" y2="184" class="svg-ray"/><text x="118" y="190" class="visual-label" text-anchor="middle">Medio abiertas</text></g><g transform="translate(350 0)"><circle cx="55" cy="128" r="8" class="svg-point"/><line x1="55" y1="128" x2="150" y2="45" class="svg-accent"/><line x1="55" y1="128" x2="150" y2="211" class="svg-ray"/><text x="105" y="190" class="visual-label" text-anchor="middle">Muy abiertas</text></g></svg>`,
+  'architecture':`<svg ${common}><rect x="90" y="55" width="150" height="110" fill="#eaf2ff" stroke="#4267a8" stroke-width="6"/><path d="M315 165 L315 65 L425 165" fill="#ffe5c8" stroke="#d87b42" stroke-width="6"/><text x="165" y="195" class="visual-label">ventana</text><text x="365" y="195" class="visual-label">techo</text></svg>`,
+  'sport':`<svg ${common}><circle cx="130" cy="140" r="10" class="svg-point"/><line x1="130" y1="140" x2="360" y2="140" class="svg-ray"/><line x1="130" y1="140" x2="130" y2="45" class="svg-accent"/><path d="M190 140 A60 60 0 0 0 130 80" class="svg-arc"/><text x="190" y="90" class="visual-label">giro</text></svg>`,
+  'triangle':`<svg ${common}><path d="M145 170 L260 55 L375 170 Z" fill="#eef5ff" stroke="#4267a8" stroke-width="6"/><text x="175" y="158" class="visual-label">60°</text><text x="345" y="158" class="visual-label">70°</text><text x="260" y="92" class="visual-label">?</text></svg>`,
+  'quadrilateral':`<svg ${common}><path d="M120 60 L410 60 L440 160 L80 160 Z" fill="#eef5ff" stroke="#4267a8" stroke-width="6"/><line x1="120" y1="60" x2="440" y2="160" stroke="#d95b8a" stroke-width="4" stroke-dasharray="8 7"/><text x="260" y="35" class="visual-label">2 triángulos</text></svg>`,
+  'complementary':`<svg ${common}><line x1="120" y1="165" x2="390" y2="165" class="svg-line"/><line x1="120" y1="165" x2="120" y2="45" class="svg-ray"/><line x1="120" y1="165" x2="205" y2="75" class="svg-accent"/><path d="M165 165 A45 45 0 0 0 151 135" class="svg-arc"/><path d="M151 135 A45 45 0 0 0 120 120" class="svg-arc"/><text x="170" y="145" class="visual-label" text-anchor="middle">55°</text><text x="132" y="105" class="visual-label" text-anchor="middle">35°</text><text x="135" y="42" class="visual-label" text-anchor="middle">90°</text></svg>`,
+  'supplementary':`<svg ${common}><line x1="70" y1="150" x2="450" y2="150" class="svg-line"/><line x1="260" y1="150" x2="210" y2="35" class="svg-ray"/><path d="M205 150 A55 55 0 0 0 237 87" class="svg-arc"/><path d="M315 150 A55 55 0 0 1 237 87" class="svg-arc"/><text x="190" y="105" class="visual-label" text-anchor="middle">110°</text><text x="320" y="105" class="visual-label" text-anchor="middle">70°</text><text x="260" y="190" class="visual-label" text-anchor="middle">180°</text></svg>`,
+  'adjacent':`<svg ${common}><line x1="80" y1="165" x2="440" y2="165" class="svg-line"/><line x1="80" y1="165" x2="250" y2="60" class="svg-ray"/><line x1="80" y1="165" x2="155" y2="55" class="svg-accent"/><circle cx="80" cy="165" r="9" class="svg-point"/><path d="M130 165 A50 50 0 0 0 121 134" class="svg-arc"/><path d="M121 134 A50 50 0 0 0 101 118" class="svg-arc"/><text x="185" y="150" class="visual-label" text-anchor="middle">ángulo A</text><text x="118" y="93" class="visual-label" text-anchor="middle">ángulo B</text><text x="255" y="45" class="visual-label" text-anchor="middle">lado común</text></svg>`,
+  'vertical':`<svg ${common}><line x1="100" y1="165" x2="420" y2="45" class="svg-line"/><line x1="100" y1="45" x2="420" y2="165" class="svg-line"/><circle cx="260" cy="105" r="8" class="svg-point"/><path d="M215 122 A50 50 0 0 1 215 88" class="svg-arc"/><path d="M305 88 A50 50 0 0 1 305 122" class="svg-arc"/><text x="178" y="108" class="visual-label" text-anchor="middle">A</text><text x="342" y="108" class="visual-label" text-anchor="middle">B</text><text x="260" y="198" class="visual-label" text-anchor="middle">opuestos por el vértice</text></svg>`
+ };
+ return svgs[type]||svgs['straight'];
+}
+
+
+function clockSvg(hour){
+  const angle=hour%12*30;
+  const rad=angle*Math.PI/180;
+  const hx=260+45*Math.sin(rad), hy=105-45*Math.cos(rad);
+  const mx=260, my=43;
+  return `<svg viewBox="0 0 520 210" role="img" aria-label="Reloj a las ${hour}:00"><circle cx="260" cy="105" r="72" class="svg-clock"/><text x="260" y="23" class="visual-label">12</text><text x="343" y="111" class="visual-label">3</text><text x="260" y="196" class="visual-label">6</text><text x="177" y="111" class="visual-label">9</text><line x1="260" y1="105" x2="${hx.toFixed(1)}" y2="${hy.toFixed(1)}" class="svg-hand"/><line x1="260" y1="105" x2="${mx.toFixed(1)}" y2="${my.toFixed(1)}" class="svg-hand2"/><circle cx="260" cy="105" r="8" class="svg-point"/></svg>`;
+}
+function exactClockAngle(hour){const a=(hour%12)*30;return Math.min(a,360-a);}
+function gameHtml(type){
+ const configs={
+  point:{prompt:'¿Dónde está el vértice?',options:['🔴 En el punto rojo','🔵 En el punto azul','🟢 En el punto verde'],correct:0},
+  count:{prompt:'¿Cuántos lados tiene este ángulo?',options:['1','2','3'],correct:1},
+  angle180:{prompt:'Escribí la medida de la apertura.',input:true,answer:'180'},
+  angle90:{prompt:'Escribí la medida del ángulo.',input:true,answer:'90'},
+  clock:{prompt:'¿Qué tipo de ángulo forman las agujas?',options:['Menor que 90°','Igual a 90°','Mayor que 90°'],correct:1},
+  scissors:{prompt:'¿En cuál situación el ángulo es mayor?',options:['Tijeras casi cerradas','Tijeras a medio abrir','Tijeras muy abiertas'],correct:2},
+  architecture:{prompt:'¿Cuál tiene una esquina que representa un ángulo recto?',options:['La ventana rectangular','El techo inclinado','Ninguno'],correct:0},
+  triangle:{prompt:'60° + 70° + ¿? = 180°. Escribí el ángulo que falta.',input:true,answer:'50'},
+  angle360:{prompt:'Escribí cuánto suman los ángulos interiores del cuadrilátero.',input:true,answer:'360'},
+  complement:{prompt:'35° + ¿? = 90°. ¿Cuánto falta?',input:true,answer:'55'},
+  supplement:{prompt:'110° + ¿? = 180°. ¿Cuánto falta?',input:true,answer:'70'},
+  adjacent:{prompt:'¿Cuál afirmación es correcta?',options:['Comparten vértice y un lado','No comparten nada','Siempre suman 360°'],correct:0},
+  opposite:{prompt:'Si un ángulo mide 70°, ¿cuánto mide el opuesto por el vértice?',input:true,answer:'70'}
+ };
+ if(type==='door') return `<p class="game-prompt">Mové la puerta. No vas a ver los grados mientras explorás. Después decidí si la apertura es menor, igual o mayor que 90°.</p><input class="game-slider" id="doorSlider" type="range" min="20" max="160" value="70"><div class="slider-value">🔎 Observá la apertura y elegí una categoría.</div><div class="game-options"><button data-door-answer="acute">Menor que 90°</button><button data-door-answer="right">Igual a 90°</button><button data-door-answer="obtuse">Mayor que 90°</button></div><p class="game-feedback" id="doorFeed"></p>`;
+ const c=configs[type];if(!c)return '';
+ if(c.input)return `<p class="game-prompt">${c.prompt}</p><input class="answer-input modal-answer" type="number" inputmode="numeric" autocomplete="off" placeholder="¿? °" data-expected="${c.answer}"><button class="check-modal">Comprobar</button><p class="game-feedback"></p>`;
+ return `<p class="game-prompt">${c.prompt}</p><div class="game-options">${c.options.map((o,i)=>`<button data-answer-index="${i}" data-correct-index="${c.correct}">${o}</button>`).join('')}</div><p class="game-feedback"></p>`;
+}
+
+function openExample(key){
+ const d=exampleData[key];if(!d)return;
+ let clockHour=null;
+ if(key==='vida-reloj'){
+   const candidates=[1,2,3,4,5,6,7,8,9,10,11];
+   clockHour=candidates[Math.floor(Math.random()*candidates.length)];
+   mv.innerHTML=clockSvg(clockHour);
+   const angle=exactClockAngle(clockHour);
+   const category=angle<90?'Menor que 90°':angle===90?'Igual a 90°':'Mayor que 90°';
+   mt.textContent='Detective del reloj';
+   mx.textContent=`El reloj marca las ${clockHour}:00. Observá las agujas y decidí qué relación tienen con 90°. La medida exacta aparecerá después de responder.`;
+   mf.textContent=`💡 ${clockHour}:00 → ${angle}° (${category.toLowerCase()})`;
+   mf.hidden=true;
+   mg.innerHTML=`<p class="game-prompt">¿El ángulo es menor, igual o mayor que 90°?</p><div class="game-options"><button data-clock-category="acute">Menor que 90°</button><button data-clock-category="right">Igual a 90°</button><button data-clock-category="obtuse">Mayor que 90°</button></div><p class="game-feedback"></p>`;
+ }else{
+   mv.innerHTML=svgVisual(d.visual);mt.textContent=d.title;mx.textContent=d.text;mf.textContent='💡 '+d.formula;mf.hidden=true;mg.innerHTML=gameHtml(d.game);
+ }
+ mf.classList.remove('answer-reveal-show');modal.classList.add('open');modal.setAttribute('aria-hidden','false');
+ const reveal=()=>{mf.hidden=false;mf.classList.add('answer-reveal-show');};
+ const buttons=mg.querySelectorAll('[data-answer-index]');
+ buttons.forEach(btn=>btn.addEventListener('click',()=>{
+   const f=mg.querySelector('.game-feedback');const ok=+btn.dataset.answerIndex===+btn.dataset.correctIndex;
+   if(ok){buttons.forEach(b=>b.disabled=true);feedbackSuccess(f,'¡Correcto!','modal-'+key);}else feedbackRetry(f,'Todavía no. Volvé a observar y probá otra opción.');reveal();
+ }));
+ const check=mg.querySelector('.check-modal');
+ if(check){check.addEventListener('click',()=>{const input=mg.querySelector('.modal-answer'),f=mg.querySelector('.game-feedback');if(!input.value.trim()){feedbackRetry(f,'Escribí una respuesta antes de comprobar.');return;}const ok=Number(input.value)===Number(input.dataset.expected);if(ok){input.disabled=true;check.disabled=true;feedbackSuccess(f,'¡Correcto!','modal-'+key);}else{feedbackRetry(f,'Todavía no. Revisá el cálculo y probá nuevamente.');}reveal();});}
+ if(key==='vida-reloj'){
+   mg.querySelectorAll('[data-clock-category]').forEach(btn=>btn.addEventListener('click',()=>{
+     const angle=exactClockAngle(clockHour);const correct=angle<90?'acute':angle===90?'right':'obtuse';const ok=btn.dataset.clockCategory===correct;const f=mg.querySelector('.game-feedback');
+     if(ok){mg.querySelectorAll('[data-clock-category]').forEach(b=>b.disabled=true);feedbackSuccess(f,'¡Correcto! Observaste bien el reloj.','modal-'+key);}else feedbackRetry(f,'Todavía no. Volvé a comparar la apertura con 90°.');reveal();
+   }));
+ }
+ if(d.game==='door'){
+   const sl=mg.querySelector('#doorSlider'),feed=mg.querySelector('#doorFeed'),sketch=mv.querySelector('#doorSketch'),arc=mv.querySelector('#doorArc'),label=mv.querySelector('#doorAngleLabel');
+   const updateDoor=()=>{const n=+sl.value;if(sketch)sketch.setAttribute('transform',`rotate(${n} 110 155)`);if(arc){const r=30,rad=n*Math.PI/180,x=(110+r*Math.sin(rad)).toFixed(1),y=(155-r*Math.cos(rad)).toFixed(1);arc.setAttribute('d',`M110 ${155-r} A${r} ${r} 0 0 1 ${x} ${y}`);}if(label){label.setAttribute('x','145');label.setAttribute('y','112');label.textContent='?';}};
+   sl.addEventListener('input',updateDoor);updateDoor();
+   mg.querySelectorAll('[data-door-answer]').forEach(btn=>btn.addEventListener('click',()=>{const n=+sl.value,cat=n<90?'acute':n===90?'right':'obtuse';if(btn.dataset.doorAnswer===cat){mg.querySelectorAll('[data-door-answer]').forEach(b=>b.disabled=true);feedbackSuccess(feed,'¡Correcto! Clasificaste la apertura sin necesitar ver los grados.','modal-'+key);}else feedbackRetry(feed,'Todavía no. Observá la apertura con respecto a un ángulo recto de 90° y probá nuevamente.');mf.textContent=`💡 La apertura elegida fue de ${n}°. ${n<90?'Es menor que 90°.':n===90?'Es exactamente 90°.':'Es mayor que 90°.'}`;reveal();}));
+ }
+}
+
+// Explicación visual paso a paso: por qué los ángulos de un triángulo suman 180°.
+const triSteps=[
+ {title:'1️⃣ Miramos el triángulo',text:'Un triángulo tiene tres ángulos. Los marcamos para poder seguirlos.',svg:`<svg viewBox="0 0 360 220" role="img" aria-label="Triángulo con sus tres ángulos marcados"><polygon points="80,180 280,180 180,45" fill="#eef5ff" stroke="#4267a8" stroke-width="6"/><path d="M80 180 A38 38 0 0 1 105 150" fill="none" stroke="#e86c6c" stroke-width="5"/><path d="M255 180 A38 38 0 0 0 232 150" fill="none" stroke="#62bd7a" stroke-width="5"/><path d="M160 72 A34 34 0 0 1 200 72" fill="none" stroke="#d95b8a" stroke-width="5"/><text x="105" y="176" fill="#b64040" font-size="20">A</text><text x="245" y="176" fill="#3d8b5a" font-size="20">B</text><text x="180" y="95" fill="#b33f72" font-size="20" text-anchor="middle">C</text></svg>`},
+ {title:'2️⃣ Separamos las tres esquinas',text:'Imaginemos que podemos sacar las tres esquinas del triángulo. Cada esquina conserva su ángulo.',svg:`<svg viewBox="0 0 360 220" role="img" aria-label="Tres ángulos separados"><path d="M45 175 L45 115 L105 175 Z" fill="#fff0f0" stroke="#e86c6c" stroke-width="5"/><path d="M145 175 L205 175 L205 115 Z" fill="#eefaf0" stroke="#62bd7a" stroke-width="5"/><path d="M270 65 L230 125 L310 125 Z" fill="#fff0f8" stroke="#d95b8a" stroke-width="5"/><text x="65" y="198" font-size="19">A</text><text x="175" y="198" font-size="19">B</text><text x="270" y="150" font-size="19">C</text></svg>`},
+ {title:'3️⃣ Las juntamos sobre una línea recta',text:'Ahora colocamos las tres esquinas una junto a otra. Las tres aberturas forman una línea recta.',svg:`<svg viewBox="0 0 360 220" role="img" aria-label="Tres ángulos juntos formando una línea recta"><line x1="35" y1="150" x2="325" y2="150" stroke="#4267a8" stroke-width="7"/><path d="M70 150 A35 35 0 0 0 102 130" fill="none" stroke="#e86c6c" stroke-width="7"/><path d="M102 130 A35 35 0 0 0 140 150" fill="none" stroke="#62bd7a" stroke-width="7"/><path d="M140 150 A35 35 0 0 1 175 150" fill="none" stroke="#d95b8a" stroke-width="7"/><text x="85" y="112" fill="#b64040" font-size="19">A</text><text x="118" y="118" fill="#3d8b5a" font-size="19">B</text><text x="153" y="118" fill="#b33f72" font-size="19">C</text><text x="180" y="190" fill="#234a88" font-size="22" text-anchor="middle">línea recta</text></svg>`},
+ {title:'4️⃣ ¡Descubrimos los 180°!',text:'Una línea recta forma 180°. Como A, B y C ocupan juntos toda la línea, sus medidas suman 180°.',svg:`<svg viewBox="0 0 360 220" role="img" aria-label="Los tres ángulos suman 180 grados"><line x1="35" y1="130" x2="325" y2="130" stroke="#4267a8" stroke-width="7"/><path d="M70 130 A35 35 0 0 0 105 105" fill="none" stroke="#e86c6c" stroke-width="7"/><path d="M105 105 A35 35 0 0 0 140 130" fill="none" stroke="#62bd7a" stroke-width="7"/><path d="M140 130 A35 35 0 0 1 175 130" fill="none" stroke="#d95b8a" stroke-width="7"/><text x="180" y="78" font-size="30" fill="#234a88" text-anchor="middle" font-weight="700">A + B + C = 180°</text><text x="180" y="185" font-size="20" fill="#234a88" text-anchor="middle">¡Una línea recta mide 180°!</text></svg>`}
+];
+let triStepIndex=0;
+function renderTriStep(){const v=document.getElementById('triangleDiscoveryVisual'),t=document.getElementById('triangleDiscoveryText'),n=document.getElementById('triStep'),prev=document.getElementById('triPrev'),next=document.getElementById('triNext'),dots=document.querySelectorAll('.discovery-dots span');if(!v||!t)return;const s=triSteps[triStepIndex];v.innerHTML=s.svg;t.innerHTML=`<h2>${s.title}</h2><p>${s.text}</p>`;n.textContent=`Paso ${triStepIndex+1} de ${triSteps.length}`;prev.disabled=triStepIndex===0;next.disabled=triStepIndex===triSteps.length-1;dots.forEach((d,i)=>d.classList.toggle('active',i===triStepIndex));}
+const triPrev=document.getElementById('triPrev'),triNext=document.getElementById('triNext');if(triPrev&&triNext){triPrev.addEventListener('click',()=>{if(triStepIndex>0){triStepIndex--;renderTriStep();}});triNext.addEventListener('click',()=>{if(triStepIndex<triSteps.length-1){triStepIndex++;renderTriStep();}});renderTriStep();}
+
+const modal=document.getElementById('exampleModal'),mv=document.getElementById('modalVisual'),mt=document.getElementById('modalTitle'),mx=document.getElementById('modalText'),mf=document.getElementById('modalFormula'),mg=document.getElementById('modalGame'),mc=document.getElementById('modalClose');
+mc.addEventListener('click',()=>{modal.classList.remove('open');modal.setAttribute('aria-hidden','true')});modal.addEventListener('click',e=>{if(e.target===modal){modal.classList.remove('open');modal.setAttribute('aria-hidden','true')}});document.addEventListener('keydown',e=>{if(e.key==='Escape')modal.classList.remove('open')});
